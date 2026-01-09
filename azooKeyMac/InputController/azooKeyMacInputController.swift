@@ -48,7 +48,7 @@ class azooKeyMacInputController: IMKInputController, NSMenuItemValidation { // s
             .appendingPathComponent("memory", isDirectory: true)
         }
 
-        let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.dev.ensan.inputmethod.azooKeyMac")
+        let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.dev.soli0222.inputmethod.azooKeyMac")
         self.segmentsManager = SegmentsManager(
             kanaKanjiConverter: (NSApplication.shared.delegate as? AppDelegate)!.kanaKanjiConverter,
             applicationDirectoryURL: applicationDirectoryURL,
@@ -477,10 +477,10 @@ class azooKeyMacInputController: IMKInputController, NSMenuItemValidation { // s
         client.overrideKeyboard(withKeyboardNamed: Config.KeyboardLayout().value.layoutIdentifier)
         switch language {
         case .english:
-            client.selectMode("dev.ensan.inputmethod.azooKeyMac.Roman")
+            client.selectMode("dev.soli0222.inputmethod.azooKeyMac.Roman")
             self.segmentsManager.stopJapaneseInput()
         case .japanese:
-            client.selectMode("dev.ensan.inputmethod.azooKeyMac.Japanese")
+            client.selectMode("dev.soli0222.inputmethod.azooKeyMac.Japanese")
         }
     }
 

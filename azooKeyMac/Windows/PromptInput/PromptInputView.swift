@@ -408,7 +408,7 @@ struct PromptInputView: View {
 
     private func loadPromptHistory() {
         // Try to load as Data first (new format)
-        if let data = UserDefaults.standard.data(forKey: "dev.ensan.inputmethod.azooKeyMac.preference.PromptHistory") {
+        if let data = UserDefaults.standard.data(forKey: "dev.soli0222.inputmethod.azooKeyMac.preference.PromptHistory") {
             if let history = try? JSONDecoder().decode([PromptHistoryItem].self, from: data) {
                 promptHistory = history
                 return
@@ -421,7 +421,7 @@ struct PromptInputView: View {
         }
 
         // Fallback to string format (legacy)
-        let historyString = UserDefaults.standard.string(forKey: "dev.ensan.inputmethod.azooKeyMac.preference.PromptHistory") ?? ""
+        let historyString = UserDefaults.standard.string(forKey: "dev.soli0222.inputmethod.azooKeyMac.preference.PromptHistory") ?? ""
         if !historyString.isEmpty,
            let data = historyString.data(using: .utf8) {
             if let history = try? JSONDecoder().decode([PromptHistoryItem].self, from: data) {
@@ -492,7 +492,7 @@ struct PromptInputView: View {
 
     private func savePinnedHistory() {
         if let data = try? JSONEncoder().encode(promptHistory) {
-            UserDefaults.standard.set(data, forKey: "dev.ensan.inputmethod.azooKeyMac.preference.PromptHistory")
+            UserDefaults.standard.set(data, forKey: "dev.soli0222.inputmethod.azooKeyMac.preference.PromptHistory")
         }
     }
 
