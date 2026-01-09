@@ -5,6 +5,7 @@ public enum InputState: Sendable, Hashable {
     case none
     case attachDiacritic(String)
     case composing
+    case directInput  // Shift+英字で開始した直接入力モード
     case previewing
     case selecting
     case replaceSuggestion
@@ -51,6 +52,10 @@ public enum InputState: Sendable, Hashable {
             case .input(let string):
                 switch inputLanguage {
                 case .japanese:
+                    // Shift押しながら大文字アルファベットで始まる場合はdirectInputモードに遷移
+                    if event.modifierFlags.contains(.shift) && self.startsWithUppercaseLetter(inputPiecesToString(string)) {
+                        return (.insertWithoutMarkedText(inputPiecesToString(string)), .transition(.directInput))
+                    }
                     return (.appendPieceToMarkedText(string), .transition(.composing))
                 case .english:
                     // 連結する
@@ -121,6 +126,10 @@ public enum InputState: Sendable, Hashable {
         case .composing:
             switch userAction {
             case .input(let string):
+                // Shift押しながら大文字アルファベットの場合は確定してdirectInputモードに遷移
+                if event.modifierFlags.contains(.shift) && self.startsWithUppercaseLetter(inputPiecesToString(string)) {
+                    return (.commitMarkedTextAndInsertWithoutMarkedText(inputPiecesToString(string)), .transition(.directInput))
+                }
                 return (.appendPieceToMarkedText(string), .fallthrough)
             case .number(let number):
                 return (.appendPieceToMarkedText([number.inputPiece]), .fallthrough)
@@ -355,6 +364,37 @@ public enum InputState: Sendable, Hashable {
             case .unknown, .function, .number, .editSegment, .transformSelectedText, .deadKey:
                 return (.fallthrough, .fallthrough)
             }
+        case .directInput:
+            // Shift+大文字アルファベットで始まった直接入力モード
+            switch userAction {
+            case .input(let string):
+                // 入力をそのまま挿入し続ける（directInputモードを維持）
+                return (.insertWithoutMarkedText(inputPiecesToString(string)), .transition(.directInput))
+            case .number(let number):
+                return (.insertWithoutMarkedText(number.inputString), .transition(.directInput))
+            case .backspace:
+                // バックスペースは通常通りフォールスルー（システムに任せる）、directInputモードを維持
+                return (.fallthrough, .transition(.directInput))
+            case .enter:
+                // Enterで.noneに戻る（改行は入力しない、日本語入力を再開）
+                return (.consume, .transition(.none))
+            case .space(let isFullSpace):
+                // スペースを挿入（directInputモードを維持）
+                if isFullSpace {
+                    return (.insertWithoutMarkedText("　"), .transition(.directInput))
+                } else {
+                    return (.insertWithoutMarkedText(" "), .transition(.directInput))
+                }
+            case .escape:
+                // Escapeで.noneに戻る
+                return (.consume, .transition(.none))
+            case .英数:
+                return (.selectInputLanguage(.english), .transition(.none))
+            case .かな:
+                return (.selectInputLanguage(.japanese), .transition(.none))
+            case .tab, .navigation, .function, .editSegment, .suggest, .forget, .transformSelectedText, .deadKey, .startUnicodeInput, .unknown:
+                return (.fallthrough, .transition(.none))
+            }
         case .unicodeInput(let codePoint):
             switch userAction {
             case .input(let pieces):
@@ -399,5 +439,13 @@ public enum InputState: Sendable, Hashable {
             case .compositionSeparator: nil
             }
         })
+    }
+
+    /// 文字列が大文字アルファベットで始まるかを判定
+    private func startsWithUppercaseLetter(_ string: String) -> Bool {
+        guard let first = string.first else {
+            return false
+        }
+        return first.isLetter && first.isUppercase
     }
 }

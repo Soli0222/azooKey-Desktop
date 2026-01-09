@@ -33,6 +33,9 @@ public enum ClientAction {
     case commitMarkedTextAndAppendToMarkedText(String)
     case commitMarkedTextAndAppendPieceToMarkedText([InputPiece])
 
+    /// MarkedTextを確定して、直接テキストを挿入する（directInputモード用）
+    case commitMarkedTextAndInsertWithoutMarkedText(String)
+
     /// デバッグウィンドウを表示するコマンド
     case enableDebugWindow
     case disableDebugWindow

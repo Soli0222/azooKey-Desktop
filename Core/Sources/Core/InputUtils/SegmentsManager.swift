@@ -433,7 +433,7 @@ public final class SegmentsManager {
 
     public func getCurrentCandidateWindow(inputState: InputState) -> CandidateWindow {
         switch inputState {
-        case .none, .previewing, .replaceSuggestion, .attachDiacritic, .unicodeInput:
+        case .none, .previewing, .replaceSuggestion, .attachDiacritic, .unicodeInput, .directInput:
             return .hidden
         case .composing:
             if !self.liveConversionEnabled, let firstCandidate = self.rawCandidates?.mainResults.first {
@@ -489,7 +489,7 @@ public final class SegmentsManager {
                 // 選択範囲なしの場合はconvertTargetを返す
                 (self.convertTarget, .inputCount(self.composingText.input.count))
             }
-        case .composing, .previewing, .none, .replaceSuggestion, .attachDiacritic, .unicodeInput:
+        case .composing, .previewing, .none, .replaceSuggestion, .attachDiacritic, .unicodeInput, .directInput:
             (self.convertTarget, .inputCount(self.composingText.input.count))
         }
         let candidateText = transform(ruby)
@@ -559,7 +559,7 @@ public final class SegmentsManager {
     // swiftlint:disable:next cyclomatic_complexity
     public func getCurrentMarkedText(inputState: InputState) -> MarkedText {
         switch inputState {
-        case .none, .attachDiacritic:
+        case .none, .attachDiacritic, .directInput:
             return MarkedText(text: [], selectionRange: .notFound)
         case .composing:
             let text = if self.lastOperation == .delete {

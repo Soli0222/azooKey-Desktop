@@ -345,6 +345,10 @@ class azooKeyMacInputController: IMKInputController, NSMenuItemValidation { // s
             // 英語モードの場合は.directでローマ字変換せずそのまま入力
             let inputStyle: InputStyle = self.inputLanguage == .english ? .direct : self.inputStyle
             self.segmentsManager.insertAtCursorPosition(pieces: pieces, inputStyle: inputStyle)
+        case .commitMarkedTextAndInsertWithoutMarkedText(let string):
+            // markedTextを確定してから、直接テキストを挿入（directInputモード用）
+            let text = self.segmentsManager.commitMarkedText(inputState: self.inputState)
+            client.insertText(text + string, replacementRange: NSRange(location: NSNotFound, length: 0))
         case .submitSelectedCandidate:
             self.submitSelectedCandidate()
         case .removeLastMarkedText:
