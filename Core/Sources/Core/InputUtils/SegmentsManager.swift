@@ -44,6 +44,15 @@ public final class SegmentsManager {
     private var replaceSuggestions: [Candidate] = []
     private var suggestSelectionIndex: Int?
 
+    public struct PredictionCandidate: Sendable {
+        public var displayText: String
+        public var appendText: String
+    }
+
+    private func candidateReading(_ candidate: Candidate) -> String {
+        candidate.data.map(\.ruby).joined()
+    }
+
     private lazy var zenzaiPersonalizationMode: ConvertRequestOptions.ZenzaiMode.PersonalizationMode? = self.getZenzaiPersonalizationMode()
 
     private func getZenzaiPersonalizationMode() -> ConvertRequestOptions.ZenzaiMode.PersonalizationMode? {
@@ -121,10 +130,15 @@ public final class SegmentsManager {
         }
     }
 
-    private func options(leftSideContext: String? = nil, requestRichCandidates: Bool = false) -> ConvertRequestOptions {
+    private func options(
+        leftSideContext: String?,
+        requestRichCandidates: Bool,
+        requireJapanesePrediction: ConvertRequestOptions.PredictionMode,
+        requireEnglishPrediction: ConvertRequestOptions.PredictionMode
+    ) -> ConvertRequestOptions {
         .init(
-            requireJapanesePrediction: false,
-            requireEnglishPrediction: false,
+            requireJapanesePrediction: requireJapanesePrediction,
+            requireEnglishPrediction: requireEnglishPrediction,
             keyboardLanguage: .ja_JP,
             englishCandidateInRoman2KanaInput: false,
             fullWidthRomanCandidate: true,
@@ -341,13 +355,21 @@ public final class SegmentsManager {
 
         /// 日付・時刻変換を事前に入れておく
         let dynamicShortcuts: [DicdataElement] =
-            [("MM/dd", -18), ("yyyy/MM/dd", -18.1), ("MM月dd日（E）", -18.2), ("yyyy年MM月dd日", -18.3)].flatMap { (format, value: PValue) in
+            [
+                ("M/d", -18, DateTemplateLiteral.CalendarType.western),
+                ("yyyy/MM/dd", -18.1, .western),
+                ("yyyy-MM-dd", -18.2, .western),
+                ("M月d日（E）", -18.3, .western),
+                ("yyyy年M月d日", -18.4, .western),
+                ("Gyyyy年M月d日", -18.5, .japanese),
+                ("E曜日", -18.6, .western)
+            ].flatMap { (format, value: PValue, type) in
                 [
-                    .init(word: DateTemplateLiteral(format: format, type: .western, language: .japanese, delta: "-2", deltaUnit: 60 * 60 * 24).export(), ruby: "オトトイ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
-                    .init(word: DateTemplateLiteral(format: format, type: .western, language: .japanese, delta: "-1", deltaUnit: 60 * 60 * 24).export(), ruby: "キノウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
-                    .init(word: DateTemplateLiteral(format: format, type: .western, language: .japanese, delta: "0", deltaUnit: 1).export(), ruby: "キョウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
-                    .init(word: DateTemplateLiteral(format: format, type: .western, language: .japanese, delta: "1", deltaUnit: 60 * 60 * 24).export(), ruby: "アシタ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
-                    .init(word: DateTemplateLiteral(format: format, type: .western, language: .japanese, delta: "2", deltaUnit: 60 * 60 * 24).export(), ruby: "アサッテ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value)
+                    .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "-2", deltaUnit: 60 * 60 * 24).export(), ruby: "オトトイ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
+                    .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "-1", deltaUnit: 60 * 60 * 24).export(), ruby: "キノウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
+                    .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "0", deltaUnit: 1).export(), ruby: "キョウ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
+                    .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "1", deltaUnit: 60 * 60 * 24).export(), ruby: "アシタ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value),
+                    .init(word: DateTemplateLiteral(format: format, type: type, language: .japanese, delta: "2", deltaUnit: 60 * 60 * 24).export(), ruby: "アサッテ", cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: value)
                 ]
             } + [
                 // 月
@@ -361,7 +383,15 @@ public final class SegmentsManager {
 
         let prefixComposingText = self.composingText.prefixToCursorPosition()
         let leftSideContext = forcedLeftSideContext ?? self.getCleanLeftSideContext(maxCount: 30)
-        let result = self.kanaKanjiConverter.requestCandidates(prefixComposingText, options: options(leftSideContext: leftSideContext, requestRichCandidates: requestRichCandidates))
+        let result = self.kanaKanjiConverter.requestCandidates(
+            prefixComposingText,
+            options: options(
+                leftSideContext: leftSideContext,
+                requestRichCandidates: requestRichCandidates,
+                requireJapanesePrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled,
+                requireEnglishPrediction: Config.DebugPredictiveTyping().value ? .manualMix : .disabled
+            )
+        )
         self.rawCandidates = result
     }
 
@@ -554,6 +584,52 @@ public final class SegmentsManager {
     // サジェスト候補の選択状態をリセット
     public func resetSuggestionSelection() {
         suggestSelectionIndex = nil
+    }
+
+    public func requestPredictionCandidates() -> [PredictionCandidate] {
+        guard Config.DebugPredictiveTyping().value else {
+            return []
+        }
+
+        let target = self.composingText.convertTarget
+        guard !target.isEmpty else {
+            return []
+        }
+
+        var matchTarget = target
+        if let last = matchTarget.last,
+           last.unicodeScalars.allSatisfy({ $0.isASCII && CharacterSet.letters.contains($0) }) {
+            matchTarget.removeLast()
+        }
+        guard matchTarget.count >= 2 else {
+            return []
+        }
+        matchTarget = matchTarget.toHiragana()
+
+        guard let rawCandidates else {
+            return []
+        }
+
+        for candidate in rawCandidates.predictionResults {
+            let reading = candidateReading(candidate)
+            guard !reading.isEmpty else {
+                continue
+            }
+            let readingHiragana = reading.toHiragana()
+            guard readingHiragana.hasPrefix(matchTarget) else {
+                continue
+            }
+            guard matchTarget.count < readingHiragana.count else {
+                continue
+            }
+            let appendText = String(readingHiragana.dropFirst(matchTarget.count))
+            guard !appendText.isEmpty else {
+                continue
+            }
+            return [.init(displayText: candidate.text, appendText: appendText)]
+        }
+
+        return []
     }
 
     // swiftlint:disable:next cyclomatic_complexity
